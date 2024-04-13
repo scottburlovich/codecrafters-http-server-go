@@ -1,17 +1,19 @@
 package main
 
-import "fmt"
-
-func echoHandler(params map[string]string) string {
+func echoHandler(req *HttpRequest, params map[string]string) string {
 	echoString := params["value"]
-	responseHeaders := buildResponseHeaders("text/plain", fmt.Sprintf("%d", len(echoString)))
-	return buildResponse(HttpOKResponse, responseHeaders, echoString)
+	return buildResponse(HttpOKResponse, echoString, nil)
 }
 
-func rootHandler(params map[string]string) string {
-	return buildResponse(HttpOKResponse, "", "")
+func rootHandler(req *HttpRequest, params map[string]string) string {
+	return buildResponse(HttpOKResponse, "", nil)
 }
 
-func notFoundHandler(params map[string]string) string {
-	return buildResponse(HttpNotFoundResponse, "", "")
+func notFoundHandler(req *HttpRequest, params map[string]string) string {
+	return buildResponse(HttpNotFoundResponse, "", nil)
+}
+
+func userAgentHandler(req *HttpRequest, params map[string]string) string {
+	userAgent := req.Headers["User-Agent"]
+	return buildResponse(HttpOKResponse, userAgent, nil)
 }

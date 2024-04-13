@@ -7,11 +7,12 @@ type Route struct {
 	Path   string
 }
 
-type HandlerFunc func(params map[string]string) string
+type HandlerFunc func(req *HttpRequest, params map[string]string) string
 
 var router = map[Route]HandlerFunc{
 	{Method: "GET", Path: "/"}:            rootHandler,
 	{Method: "GET", Path: "/echo/:value"}: echoHandler,
+	{Method: "GET", Path: "/user-agent"}:  userAgentHandler,
 }
 
 func findRoute(req *HttpRequest) (HandlerFunc, map[string]string) {

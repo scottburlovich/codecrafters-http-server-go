@@ -35,7 +35,7 @@ func handleConnection(conn net.Conn) {
 
 func handleRequest(req *HttpRequest) string {
 	handler, params := findRoute(req)
-	return handler(params)
+	return handler(req, params)
 }
 
 func parseRequest(request []byte) (*HttpRequest, error) {
