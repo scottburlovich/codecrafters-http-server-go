@@ -12,7 +12,7 @@ func buildResponseHeaders(contentType string, contentLength string, customHeader
 		"Content-Length: " + contentLength,
 	}
 
-	if customHeaders != nil { // check if customHeaders is not nil
+	if customHeaders != nil {
 		for key, value := range *customHeaders {
 			customHeader := key + ": " + value
 			headers = append(headers, customHeader)
