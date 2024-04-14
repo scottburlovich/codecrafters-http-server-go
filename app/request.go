@@ -1,9 +1,14 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
+	"mime"
+	"mime/multipart"
 	"net"
+	"strconv"
 	"strings"
 )
 
@@ -13,28 +18,58 @@ type HttpRequest struct {
 	ClientIP        string
 	ProtocolVersion string
 	Headers         map[string]string
+	Body            string
+	BodyContentType string
 }
 
 func handleConnection(conn net.Conn, filesDir string) {
 	defer conn.Close()
 
-	buf := make([]byte, 1024)
-	_, err := conn.Read(buf)
+	var buf bytes.Buffer
+	reader := bufio.NewReader(conn)
+	contentLength := 0
+
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			handleError("Failed to read request line", err)
+			return
+		}
+		line = strings.TrimSuffix(line, "\r\n")
+		buf.WriteString(line + "\r\n")
+
+		if line == "" {
+			break
+		}
+
+		if strings.HasPrefix(line, "Content-Length:") {
+			size := strings.Trim(strings.TrimPrefix(line, "Content-Length:"), " ")
+			contentLength, err = strconv.Atoi(size)
+			if err != nil {
+				handleError("Failed to parse Content-Length", err)
+				return
+			}
+		}
+	}
+
+	if contentLength > 0 {
+		body := make([]byte, contentLength)
+		bytesRead, err := reader.Read(body)
+		if err != nil || bytesRead != contentLength {
+			handleError("Failed to read request body", err)
+			return
+		}
+		buf.Write(body)
+	}
+
+	request, err := parseRequest(buf.Bytes())
 	if err != nil {
-		fmt.Println("Error reading from connection: ", err.Error())
+		handleError("Failed to parse request", err)
 		return
 	}
 
-	req, err := parseRequest(buf)
-	if err != nil {
-		fmt.Println("Error parsing HTTP request: ", err.Error())
-		return
-	}
-
-	// Get the client IP address from the connection
-	req.ClientIP = conn.RemoteAddr().String()
-
-	handleRequest(conn, req, filesDir)
+	request.ClientIP = conn.RemoteAddr().String()
+	handleRequest(conn, request, filesDir)
 }
 
 func handleRequest(conn net.Conn, req *HttpRequest, filesDir string) {
@@ -68,8 +103,10 @@ func parseRequest(request []byte) (*HttpRequest, error) {
 		Headers:         make(map[string]string),
 	}
 
-	for _, line := range lines[1:] {
+	bodyLinesIndex := 0
+	for i, line := range lines[1:] {
 		if line == "" {
+			bodyLinesIndex = i + 2
 			break
 		}
 		header := strings.SplitN(line, ": ", 2)
@@ -77,6 +114,28 @@ func parseRequest(request []byte) (*HttpRequest, error) {
 			return nil, errors.New("invalid header: " + line)
 		}
 		httpRequest.Headers[header[0]] = header[1]
+	}
+	httpRequest.Body = strings.Join(lines[bodyLinesIndex:], "\r\n")
+
+	if httpRequest.Method == "POST" && strings.Contains(httpRequest.Headers["Content-Type"], "multipart/form-data") {
+		mediaType, params, err := mime.ParseMediaType(httpRequest.Headers["Content-Type"])
+		if err != nil {
+			return nil, errors.New("invalid Content-Type header: " + err.Error())
+		}
+		httpRequest.BodyContentType = mediaType
+
+		if mediaType == "multipart/form-data" {
+			body := strings.NewReader(httpRequest.Body)
+			mr := multipart.NewReader(body, params["boundary"])
+
+			formData, err := mr.ReadForm(-1)
+			if err != nil {
+				return nil, errors.New("invalid multipart form: " + err.Error())
+			}
+
+			fmt.Println("Form data:", formData.Value)
+			fmt.Println("Files:", formData.File)
+		}
 	}
 
 	return httpRequest, nil

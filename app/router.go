@@ -11,10 +11,11 @@ type HandlerFunc func(args HandlerArgs)
 
 func getRouter(args HandlerArgs) map[Route]HandlerFunc {
 	return map[Route]HandlerFunc{
-		{Method: "GET", Path: "/"}:                rootHandler,
-		{Method: "GET", Path: "/echo/:value"}:     echoHandler,
-		{Method: "GET", Path: "/user-agent"}:      userAgentHandler,
-		{Method: "GET", Path: "/files/:filename"}: filesHandler,
+		{Method: "GET", Path: "/"}:                 rootHandler,
+		{Method: "GET", Path: "/echo/:value"}:      echoHandler,
+		{Method: "GET", Path: "/user-agent"}:       userAgentHandler,
+		{Method: "GET", Path: "/files/:filename"}:  fileDownloadHandler,
+		{Method: "POST", Path: "/files/:filename"}: fileUploadHandler,
 	}
 }
 

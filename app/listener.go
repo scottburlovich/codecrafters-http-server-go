@@ -1,8 +1,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net"
+	"os"
 	"path/filepath"
 )
 
@@ -32,6 +34,17 @@ func handleConnections(listener net.Listener, filesDir string) {
 			fmt.Println("Error resolving absolute path of --directory argument: ", err)
 			return
 		}
+		_, err = os.Stat(filesDir)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				fmt.Printf("Error: directory %s does not exist\n", filesDir)
+
+			} else {
+				fmt.Printf("Error accessing directory %s: %s\n", filesDir, err)
+			}
+			return
+		}
+
 		fmt.Printf("NOTE: /files route serving content from: %s\n", filesDir)
 	}
 
