@@ -10,11 +10,12 @@ import (
 type HttpRequest struct {
 	Method          string
 	URI             string
+	ClientIP        string
 	ProtocolVersion string
 	Headers         map[string]string
 }
 
-func handleConnection(conn net.Conn) {
+func handleConnection(conn net.Conn, filesDir string) {
 	defer conn.Close()
 
 	buf := make([]byte, 1024)
@@ -30,12 +31,22 @@ func handleConnection(conn net.Conn) {
 		return
 	}
 
-	handleResponse(conn, req)
+	// Get the client IP address from the connection
+	req.ClientIP = conn.RemoteAddr().String()
+
+	handleRequest(conn, req, filesDir)
 }
 
-func handleRequest(req *HttpRequest) string {
-	handler, params := findRoute(req)
-	return handler(req, params)
+func handleRequest(conn net.Conn, req *HttpRequest, filesDir string) {
+	args := HandlerArgs{
+		Conn:     conn,
+		Req:      req,
+		Params:   nil,
+		FileRoot: filesDir,
+	}
+
+	handler, args := findRoute(args)
+	handler(args)
 }
 
 func parseRequest(request []byte) (*HttpRequest, error) {

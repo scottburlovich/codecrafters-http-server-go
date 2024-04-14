@@ -1,9 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func buildResponseHeaders(contentType string, contentLength string, customHeaders *map[string]string) string {
@@ -22,23 +25,46 @@ func buildResponseHeaders(contentType string, contentLength string, customHeader
 	return strings.Join(headers, Separator) + Separator
 }
 
-func buildResponse(status, body string, customHeaders *map[string]string) string {
-	contentType := detectContentType([]byte(body))
+func buildResponse(args HandlerArgs, status, body string, customContentType *string, customHeaders *map[string]string) {
+	var contentType string
+	if customContentType != nil {
+		contentType = *customContentType
+	} else {
+		contentType = detectContentType([]byte(body))
+	}
 	contentLength := strconv.Itoa(len(body))
 
 	headers := buildResponseHeaders(contentType, contentLength, customHeaders)
-
+	var response string
 	if headers == "" && body == "" {
-		return status + Separator + Separator
+		response = status + Separator + Separator
 	}
-	return status + headers + Separator + body
+	response = status + headers + Separator + body
+
+	handleResponse(args.Conn, response)
+	outputAccessLog(args, status, contentLength)
 }
 
-func handleResponse(conn net.Conn, req *HttpRequest) {
-	var err error
-	response := handleRequest(req)
+func outputAccessLog(args HandlerArgs, status string, contentLength string) {
+	currentTime := time.Now().UTC()
+	formattedTime := currentTime.Format("2006-01-02 15:04:05")
+	re := regexp.MustCompile(`\d{3}`)
+	code := re.FindString(status)
+	requestStr := fmt.Sprintf("%s %s %s", args.Req.Method, args.Req.URI, args.Req.ProtocolVersion)
 
-	_, err = conn.Write([]byte(response))
+	fmt.Printf(
+		"%s - - [%s] \"%s\" %s %s \"%s\"\n",
+		args.Req.ClientIP,
+		formattedTime,
+		requestStr,
+		code,
+		contentLength,
+		args.Req.Headers["User-Agent"],
+	)
+}
+
+func handleResponse(conn net.Conn, response string) {
+	_, err := conn.Write([]byte(response))
 	if err != nil {
 		handleError("Error writing response to connection", err)
 	}
